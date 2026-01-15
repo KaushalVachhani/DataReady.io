@@ -58,6 +58,7 @@ A production-ready platform for simulating realistic data engineering interviews
 ### Prerequisites
 
 - Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
 - Databricks account with Gemini model access
 - Microphone and webcam (for interview)
 
@@ -65,19 +66,22 @@ A production-ready platform for simulating realistic data engineering interviews
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-org/dataready-io.git
-   cd dataready-io
+   git clone https://github.com/KaushalVachhani/DataReady.io.git
+   cd DataReady.io
    ```
 
-2. **Create virtual environment**
+2. **Install uv** (if not already installed)
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   # macOS/Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # Windows
+   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
    ```
 
 3. **Install dependencies**
    ```bash
-   pip install -e .
+   uv sync
    ```
 
 4. **Configure environment**
@@ -88,13 +92,23 @@ A production-ready platform for simulating realistic data engineering interviews
 
 5. **Run the server**
    ```bash
-   python main.py
+   uv run python main.py
    ```
 
 6. **Open in browser**
    ```
    http://localhost:8000
    ```
+
+### Docker (Alternative)
+
+```bash
+# Build the image
+docker build -t dataready .
+
+# Run the container
+docker run -p 8000:8000 --env-file .env dataready
+```
 
 ---
 
@@ -191,6 +205,35 @@ Each response is scored on 5 dimensions (0-10):
 | `WHISPER_MODEL` | STT model size | `large-v3` |
 | `TTS_MODEL` | TTS engine | `edge-tts` |
 | `MAX_QUESTIONS` | Questions per interview | `10` |
+
+---
+
+## 🚢 Deployment
+
+### Railway
+
+1. Connect your GitHub repository to Railway
+2. Add environment variables in Railway dashboard:
+   - `DATABRICKS_HOST`
+   - `DATABRICKS_TOKEN`
+   - `GEMINI_PRO_ENDPOINT`
+   - `GEMINI_FLASH_ENDPOINT`
+3. Deploy! Railway will auto-detect the Dockerfile
+
+### Manual Docker Deployment
+
+```bash
+# Build
+docker build -t dataready .
+
+# Run with environment variables
+docker run -d -p 8000:8000 \
+  -e DATABRICKS_HOST="your-host" \
+  -e DATABRICKS_TOKEN="your-token" \
+  -e GEMINI_PRO_ENDPOINT="your-endpoint" \
+  -e GEMINI_FLASH_ENDPOINT="your-endpoint" \
+  dataready
+```
 
 ---
 
