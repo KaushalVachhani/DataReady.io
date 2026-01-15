@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.cursor/
+
+# Git
+.git/
+.gitignore
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Build
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Docs (keep in deployment)
+# docs/
+
+# Temp files
+*.log
+*.tmp
+temp/
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local development
+*.local
+.env.local
+.env.development
+
+# Audio temp files (if any)
+*.wav
+*.mp3
+audio_temp/

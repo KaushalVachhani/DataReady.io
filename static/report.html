@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Report - DataReady.io</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css?v=7">
+</head>
+<body class="report-page">
+    <!-- Ambient Background -->
+    <div class="ambient-bg">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-3"></div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <a href="/" class="logo" style="text-decoration: none;">
+                <div class="logo-icon" title="DataReady.io">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 8L14 4L22 8V20L14 24L6 20V8Z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+                        <path d="M14 12L14 16" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M10 14H18" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="14" cy="14" r="2" fill="white"/>
+                    </svg>
+                </div>
+                <span class="logo-text">DataReady<span class="logo-dot">.io</span></span>
+            </a>
+        </header>
+
+        <!-- Report Container -->
+        <div class="report-container" id="report-container">
+            <!-- Loading State -->
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div class="loading-text">Generating your interview report...</div>
+            </div>
+
+            <!-- Report Content (hidden until loaded) -->
+            <div id="report-content" style="display: none;">
+                <!-- Report Header -->
+                <div class="report-header">
+                    <h1>Interview Performance Report</h1>
+                    <p class="report-meta">
+                        <span id="report-role">Data Engineer</span> • 
+                        <span id="report-duration">0</span> minutes • 
+                        <span id="report-date"></span>
+                    </p>
+                </div>
+
+                <!-- Interview Stats -->
+                <section class="interview-stats">
+                    <div class="stat-box">
+                        <div class="stat-icon icon-primary">
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                                <rect x="6" y="4" width="20" height="24" rx="2" stroke="currentColor" stroke-width="2"/>
+                                <path d="M10 10H22M10 16H22M10 22H18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </div>
+                        <div class="stat-number" id="stat-total">0</div>
+                        <div class="stat-label">Questions Asked</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-icon icon-success">
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                                <circle cx="16" cy="16" r="12" stroke="currentColor" stroke-width="2"/>
+                                <path d="M10 16L14 20L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="stat-number" id="stat-answered">0</div>
+                        <div class="stat-label">Answered</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-icon icon-warning">
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                                <circle cx="16" cy="16" r="12" stroke="currentColor" stroke-width="2"/>
+                                <path d="M12 16H20M20 16L16 12M20 16L16 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="stat-number" id="stat-skipped">0</div>
+                        <div class="stat-label">Skipped</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-icon icon-accent">
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                                <circle cx="16" cy="16" r="12" stroke="currentColor" stroke-width="2"/>
+                                <circle cx="16" cy="16" r="4" stroke="currentColor" stroke-width="2"/>
+                                <circle cx="16" cy="16" r="1" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <div class="stat-number" id="stat-followups">0</div>
+                        <div class="stat-label">Follow-ups</div>
+                    </div>
+                </section>
+
+                <!-- Score Section -->
+                <section class="score-section">
+                    <!-- Overall Score -->
+                    <div class="overall-score">
+                        <div class="score-circle">
+                            <svg width="180" height="180" viewBox="0 0 180 180">
+                                <defs>
+                                    <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#7c6aff"/>
+                                        <stop offset="100%" style="stop-color:#ff7a5c"/>
+                                    </linearGradient>
+                                </defs>
+                                <circle class="score-bg" cx="90" cy="90" r="78"/>
+                                <circle class="score-progress" id="score-circle" cx="90" cy="90" r="78" 
+                                    stroke-dasharray="490" stroke-dashoffset="490"/>
+                            </svg>
+                            <div class="score-value">
+                                <span class="score-number" id="score-number">0</span>
+                                <span class="score-label">out of 100</span>
+                            </div>
+                        </div>
+                        
+                        <div class="verdict">
+                            <div class="verdict-label">Hiring Verdict</div>
+                            <div class="verdict-value" id="verdict-value">Evaluating...</div>
+                        </div>
+                    </div>
+
+                    <!-- Dimension Scores -->
+                    <div class="dimension-scores">
+                        <h3>Performance Breakdown</h3>
+                        
+                        <div class="dimension-bar" id="dim-technical">
+                            <div class="dimension-header">
+                                <span class="dimension-name">Technical Correctness</span>
+                                <span class="dimension-value">0/10</span>
+                            </div>
+                            <div class="dimension-track">
+                                <div class="dimension-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="dimension-bar" id="dim-depth">
+                            <div class="dimension-header">
+                                <span class="dimension-name">Depth of Understanding</span>
+                                <span class="dimension-value">0/10</span>
+                            </div>
+                            <div class="dimension-track">
+                                <div class="dimension-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="dimension-bar" id="dim-practical">
+                            <div class="dimension-header">
+                                <span class="dimension-name">Practical Experience</span>
+                                <span class="dimension-value">0/10</span>
+                            </div>
+                            <div class="dimension-track">
+                                <div class="dimension-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="dimension-bar" id="dim-communication">
+                            <div class="dimension-header">
+                                <span class="dimension-name">Communication Clarity</span>
+                                <span class="dimension-value">0/10</span>
+                            </div>
+                            <div class="dimension-track">
+                                <div class="dimension-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="dimension-bar" id="dim-confidence">
+                            <div class="dimension-header">
+                                <span class="dimension-name">Confidence</span>
+                                <span class="dimension-value">0/10</span>
+                            </div>
+                            <div class="dimension-track">
+                                <div class="dimension-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Feedback Section -->
+                <section class="feedback-section">
+                    <div class="feedback-card strengths-card">
+                        <h3>
+                            <span class="icon icon-success">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 2L15 8L22 9L17 14L18 21L12 18L6 21L7 14L2 9L9 8L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                </svg>
+                            </span>
+                            Strengths
+                        </h3>
+                        <ul class="feedback-list" id="strengths-list">
+                            <li>Loading...</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="feedback-card improvements-card">
+                        <h3>
+                            <span class="icon icon-warning">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 4V16M12 20V20.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    <path d="M3 20H21L12 4L3 20Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                </svg>
+                            </span>
+                            Areas for Improvement
+                        </h3>
+                        <ul class="feedback-list" id="improvements-list">
+                            <li>Loading...</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- Communication Feedback -->
+                <section class="feedback-card" style="margin-bottom: var(--space-2xl);">
+                    <h3>
+                        <span class="icon icon-primary">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M21 11.5C21 16.75 16.75 21 11.5 21C9.5 21 7.5 20.5 6 19.5L3 21L4.5 17C3.5 15.5 3 13.5 3 11.5C3 6.25 7.25 2 12.5 2C17.75 2 21 6.25 21 11.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
+                        Communication Feedback
+                    </h3>
+                    <p id="communication-feedback" style="color: var(--color-text-secondary); line-height: 1.8;">
+                        Loading...
+                    </p>
+                </section>
+
+                <!-- Per-Question Feedback -->
+                <section class="questions-section">
+                    <h3>
+                        <span class="icon icon-accent">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+                                <path d="M3 9H21M9 21V9" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </span>
+                        Question-by-Question Breakdown
+                    </h3>
+                    <div class="questions-list" id="questions-list">
+                        <!-- Populated by JS -->
+                    </div>
+                </section>
+
+                <!-- Study Roadmap -->
+                <section class="roadmap-section">
+                    <h3>
+                        <span class="icon icon-primary">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M4 19V5C4 4 5 3 6 3H18C19 3 20 4 20 5V19C20 20 19 21 18 21H6C5 21 4 20 4 19Z" stroke="currentColor" stroke-width="2"/>
+                                <path d="M8 7H16M8 11H16M8 15H12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                        Recommended Study Roadmap
+                    </h3>
+                    <div class="roadmap-weeks" id="roadmap-weeks">
+                        <!-- Populated by JS -->
+                    </div>
+                </section>
+
+                <!-- Actions -->
+                <div class="report-actions">
+                    <button class="btn-secondary" onclick="handlePrint()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right: 6px;">
+                            <path d="M6 9V2H18V9M6 18H4C3 18 2 17 2 16V11C2 10 3 9 4 9H20C21 9 22 10 22 11V16C22 17 21 18 20 18H18M6 14H18V22H6V14Z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        Export Report
+                    </button>
+                    <button class="btn-secondary" onclick="expandAllQuestions()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right: 6px;">
+                            <path d="M3 7V5C3 4 4 3 5 3H19C20 3 21 4 21 5V7M3 17V19C3 20 4 21 5 21H19C20 21 21 20 21 19V17M7 12H17M12 7V17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        Expand All
+                    </button>
+                    <button class="btn-secondary" onclick="collapseAllQuestions()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right: 6px;">
+                            <path d="M3 7V5C3 4 4 3 5 3H19C20 3 21 4 21 5V7M3 17V19C3 20 4 21 5 21H19C20 21 21 20 21 19V17M7 12H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        Collapse All
+                    </button>
+                    <button class="btn-primary" onclick="window.location.href='/'">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right: 6px;">
+                            <path d="M12 4V20M12 4L6 10M12 4L18 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Start New Interview
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/report.js?v=4"></script>
+</body>
+</html>
