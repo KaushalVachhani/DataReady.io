@@ -101,11 +101,16 @@ async def health_check():
 # ============================================================================
 
 if __name__ == "__main__":
+    import os
     import uvicorn
+    
+    # Databricks Apps provides port via DATABRICKS_APP_PORT environment variable
+    # Fall back to settings.port for local development
+    port = int(os.environ.get("DATABRICKS_APP_PORT", settings.port))
     
     uvicorn.run(
         "main:app",
         host=settings.host,
-        port=settings.port,
+        port=port,
         reload=settings.debug,
     )

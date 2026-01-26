@@ -1,0 +1,23 @@
+# DataReady.io - Python Dependencies
+# Generated from pyproject.toml for Databricks Apps compatibility
+
+# Web Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+websockets>=12.0
+
+# Data Validation
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# HTTP Client
+httpx>=0.26.0
+
+# Audio Processing
+openai-whisper>=20231117
+edge-tts>=6.1.9
+pydub>=0.25.1
+
+# Utilities
+python-dotenv>=1.0.0

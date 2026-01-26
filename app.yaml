@@ -1,0 +1,37 @@
+# Databricks Apps Configuration
+# https://docs.databricks.com/en/dev-tools/apps/index.html
+
+# App entry point command
+command:
+  - "uvicorn"
+  - "main:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "${DATABRICKS_APP_PORT}"
+
+# Environment variables (secrets should be configured in Databricks UI)
+env:
+  - name: DATABRICKS_HOST
+    valueFrom: DATABRICKS_HOST
+  - name: DATABRICKS_TOKEN
+    valueFrom: DATABRICKS_TOKEN
+  - name: GEMINI_PRO_ENDPOINT
+    valueFrom: GEMINI_PRO_ENDPOINT
+  - name: GEMINI_FLASH_ENDPOINT
+    valueFrom: GEMINI_FLASH_ENDPOINT
+  - name: USE_LOCAL_WHISPER
+    value: "false"
+  - name: DEBUG
+    value: "false"
+  - name: TTS_VOICE
+    value: "en-US-GuyNeural"
+  - name: MAX_INTERVIEW_QUESTIONS
+    value: "10"
+  - name: MAX_FOLLOWUPS_PER_QUESTION
+    value: "2"
+
+# Resources configuration (optional - uses defaults if not specified)
+resources:
+  memory: "4Gi"
+  cpu: "2"

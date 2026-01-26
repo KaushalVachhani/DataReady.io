@@ -210,6 +210,35 @@ Each response is scored on 5 dimensions (0-10):
 
 ## 🚢 Deployment
 
+### Databricks Apps (Recommended)
+
+Deploy directly to your Databricks workspace:
+
+1. **Navigate to Apps in Databricks**
+   - Go to your Databricks workspace
+   - Click on **Compute** → **Apps**
+   - Click **Create App**
+
+2. **Configure the App**
+   - Name: `dataready-io`
+   - Source: Connect your GitHub repository or upload files
+   - The `app.yaml` configuration will be auto-detected
+
+3. **Set Environment Variables (Secrets)**
+   
+   In the Databricks Apps UI, configure these secrets:
+   
+   | Variable | Description |
+   |----------|-------------|
+   | `DATABRICKS_HOST` | Your Databricks workspace URL |
+   | `DATABRICKS_TOKEN` | Personal Access Token |
+   | `GEMINI_PRO_ENDPOINT` | Gemini Pro model endpoint |
+   | `GEMINI_FLASH_ENDPOINT` | Gemini Flash model endpoint |
+
+4. **Deploy**
+   - Click **Deploy** and wait for the app to start
+   - Access via the provided Databricks App URL
+
 ### Railway
 
 1. Connect your GitHub repository to Railway
