@@ -2,13 +2,11 @@
 # https://docs.databricks.com/en/dev-tools/apps/index.html
 
 # App entry point command
+# Use shell to expand environment variables
 command:
-  - "uvicorn"
-  - "main:app"
-  - "--host"
-  - "0.0.0.0"
-  - "--port"
-  - "${DATABRICKS_APP_PORT}"
+  - "/bin/sh"
+  - "-c"
+  - "uvicorn main:app --host 0.0.0.0 --port $DATABRICKS_APP_PORT"
 
 # Environment variables (secrets should be configured in Databricks UI)
 env:
