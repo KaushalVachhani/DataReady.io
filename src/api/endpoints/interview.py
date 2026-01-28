@@ -289,18 +289,31 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
         await websocket.close(code=4004, reason="Session not found")
         return
     
+    import logging
+    ws_logger = logging.getLogger(__name__)
+    
     try:
         while True:
             data = await websocket.receive_json()
             message_type = data.get("type")
+            ws_logger.info(f"WebSocket received message type: {message_type}")
             
             if message_type == "start":
                 # Start the interview
-                result = await orchestrator.start_interview(session_id)
-                await websocket.send_json({
-                    "type": "question",
-                    "data": result,
-                })
+                try:
+                    ws_logger.info(f"Starting interview for session {session_id}")
+                    result = await orchestrator.start_interview(session_id)
+                    ws_logger.info(f"Interview started, sending question: {result.get('action')}")
+                    await websocket.send_json({
+                        "type": "question",
+                        "data": result,
+                    })
+                except Exception as start_error:
+                    ws_logger.error(f"Error starting interview: {start_error}", exc_info=True)
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"Failed to start interview: {str(start_error)}",
+                    })
                 
             elif message_type == "transcript":
                 # Process transcribed response

@@ -42,10 +42,10 @@ logger = logging.getLogger(__name__)
 # Langfuse imports
 try:
     from langfuse import Langfuse
-    from langfuse.decorators import observe, langfuse_context
     LANGFUSE_AVAILABLE = True
 except ImportError:
     LANGFUSE_AVAILABLE = False
+    Langfuse = None
     logger.warning("Langfuse not installed. Tracing disabled.")
 
 
@@ -147,8 +147,6 @@ class AIReasoningLayer:
         Returns:
             Model response text
         """
-        generation = None
-        
         try:
             payload = {
                 "messages": [
@@ -158,23 +156,6 @@ class AIReasoningLayer:
                 "temperature": 0.7,
             }
             
-            # Start Langfuse generation tracking
-            if self.langfuse:
-                generation = self.langfuse.generation(
-                    name=trace_name,
-                    model="gemini-3-pro",
-                    model_parameters={
-                        "max_tokens": max_tokens,
-                        "temperature": 0.7,
-                    },
-                    input={"messages": payload["messages"]},
-                    metadata={
-                        "endpoint": self.settings.gemini_pro_endpoint,
-                        "session_id": session_id,
-                        **(trace_metadata or {}),
-                    },
-                )
-            
             response = await self.client.post(
                 self.settings.gemini_pro_endpoint,
                 json=payload,
@@ -182,30 +163,10 @@ class AIReasoningLayer:
             response.raise_for_status()
             
             result = response.json()
-            output = self._extract_content(result)
-            
-            # Complete Langfuse generation
-            if generation:
-                generation.end(
-                    output=output,
-                    usage={
-                        "input": len(prompt.split()),  # Approximate token count
-                        "output": len(output.split()),
-                    },
-                    level="DEFAULT",
-                )
-            
-            return output
+            return self._extract_content(result)
             
         except httpx.HTTPError as e:
             logger.error(f"Gemini Pro API error: {e}")
-            # Log error to Langfuse
-            if generation:
-                generation.end(
-                    output=None,
-                    level="ERROR",
-                    status_message=str(e),
-                )
             raise
     
     async def _call_gemini_flash(
@@ -229,8 +190,6 @@ class AIReasoningLayer:
         Returns:
             Model response text
         """
-        generation = None
-        
         try:
             payload = {
                 "messages": [
@@ -240,23 +199,6 @@ class AIReasoningLayer:
                 "temperature": 0.8,
             }
             
-            # Start Langfuse generation tracking
-            if self.langfuse:
-                generation = self.langfuse.generation(
-                    name=trace_name,
-                    model="gemini-flash",
-                    model_parameters={
-                        "max_tokens": max_tokens,
-                        "temperature": 0.8,
-                    },
-                    input={"messages": payload["messages"]},
-                    metadata={
-                        "endpoint": self.settings.gemini_flash_endpoint,
-                        "session_id": session_id,
-                        **(trace_metadata or {}),
-                    },
-                )
-            
             response = await self.client.post(
                 self.settings.gemini_flash_endpoint,
                 json=payload,
@@ -264,30 +206,10 @@ class AIReasoningLayer:
             response.raise_for_status()
             
             result = response.json()
-            output = self._extract_content(result)
-            
-            # Complete Langfuse generation
-            if generation:
-                generation.end(
-                    output=output,
-                    usage={
-                        "input": len(prompt.split()),
-                        "output": len(output.split()),
-                    },
-                    level="DEFAULT",
-                )
-            
-            return output
+            return self._extract_content(result)
             
         except httpx.HTTPError as e:
             logger.error(f"Gemini Flash API error: {e}")
-            # Log error to Langfuse
-            if generation:
-                generation.end(
-                    output=None,
-                    level="ERROR",
-                    status_message=str(e),
-                )
             raise
     
     # =========================================================================
@@ -314,23 +236,25 @@ class AIReasoningLayer:
         max_attempts = 3
         session_id = context.session.session_id
         
-        # Create Langfuse trace for the entire question generation flow
-        trace = None
+        # Create Langfuse span for the entire question generation flow (v3 API)
+        span = None
         if self.langfuse:
-            trace = self.langfuse.trace(
-                name="generate_question",
-                session_id=session_id,
-                user_id=context.session.setup.target_role.value,
-                metadata={
-                    "question_number": context.session.total_core_questions_asked + 1,
-                    "difficulty": context.session.current_difficulty,
-                    "skills_covered": len(context.skills_covered),
-                    "skills_remaining": len(context.skills_remaining),
-                    "role": context.session.setup.target_role.value,
-                    "cloud_preference": context.session.setup.cloud_preference.value,
-                },
-                tags=["question_generation", context.session.setup.target_role.value],
-            )
+            try:
+                span = self.langfuse.start_span(
+                    name="generate_question",
+                    metadata={
+                        "session_id": session_id,
+                        "question_number": context.session.total_core_questions_asked + 1,
+                        "difficulty": context.session.current_difficulty,
+                        "skills_covered": len(context.skills_covered),
+                        "skills_remaining": len(context.skills_remaining),
+                        "role": context.session.setup.target_role.value,
+                        "cloud_preference": context.session.setup.cloud_preference.value,
+                    },
+                )
+            except Exception as lf_err:
+                logger.warning(f"Langfuse span start failed: {lf_err}")
+                span = None
         
         # Log context for debugging
         logger.info(
@@ -344,13 +268,9 @@ class AIReasoningLayer:
             # Build the prompt
             prompt = self.interviewer_prompts.generate_question_prompt(context)
             
-            # Log span for prompt building
-            if trace:
-                trace.span(
-                    name="build_prompt",
-                    input={"attempt": attempt + 1},
-                    output={"prompt_length": len(prompt)},
-                )
+            # Log for prompt building
+            if span:
+                logger.debug(f"Built prompt for attempt {attempt + 1}, length: {len(prompt)}")
             
             try:
                 # Call Gemini Pro with trace context
@@ -374,13 +294,6 @@ class AIReasoningLayer:
                         f"Duplicate question detected (attempt {attempt + 1}): "
                         f"'{question.text[:50]}...' - regenerating..."
                     )
-                    if trace:
-                        trace.span(
-                            name="duplicate_check",
-                            input={"question_text": question.text[:100]},
-                            output={"is_duplicate": True},
-                            level="WARNING",
-                        )
                     continue
                 
                 # Also check if the same skill was recently asked (for core questions)
@@ -392,41 +305,33 @@ class AIReasoningLayer:
                 
                 logger.info(f"Generated new question on skill: {question.skill_id}")
                 
-                # Update trace with success
-                if trace:
-                    trace.update(
-                        output={
+                # End span with success
+                if span:
+                    try:
+                        span.end(output={
                             "question_id": question.id,
                             "skill_id": question.skill_id,
                             "difficulty": question.difficulty.value,
                             "attempts": attempt + 1,
-                        },
-                        level="DEFAULT",
-                    )
+                        })
+                    except Exception:
+                        pass
                 
                 return question
                 
             except Exception as e:
                 logger.error(f"Question generation failed (attempt {attempt + 1}): {e}")
-                if trace:
-                    trace.span(
-                        name="generation_error",
-                        input={"attempt": attempt + 1},
-                        output={"error": str(e)},
-                        level="ERROR",
-                    )
                 if attempt == max_attempts - 1:
                     break
         
         # Fallback to a default question (with deduplication)
         logger.warning("Using fallback question due to generation failures")
         
-        if trace:
-            trace.span(
-                name="fallback_used",
-                output={"reason": "generation_failures"},
-                level="WARNING",
-            )
+        if span:
+            try:
+                span.end(output={"fallback_used": True, "reason": "generation_failures"})
+            except Exception:
+                pass
         
         return self._get_fallback_question(context)
     
@@ -744,21 +649,6 @@ class AIReasoningLayer:
         """
         session_id = context.session.session_id
         
-        # Create Langfuse trace for follow-up decision
-        trace = None
-        if self.langfuse:
-            trace = self.langfuse.trace(
-                name="generate_followup",
-                session_id=session_id,
-                metadata={
-                    "question_id": evaluation.question_id,
-                    "overall_score": evaluation.scores.overall_score,
-                    "needs_followup": evaluation.needs_followup,
-                    "followup_reason": evaluation.followup_reason,
-                },
-                tags=["followup_decision"],
-            )
-        
         prompt = self.interviewer_prompts.generate_followup_prompt(context, evaluation)
         
         try:
@@ -774,27 +664,12 @@ class AIReasoningLayer:
             )
             
             result = self._parse_followup_response(response, evaluation)
-            
-            # Update trace with result
-            if trace:
-                trace.update(
-                    output={
-                        "should_followup": result.should_followup,
-                        "followup_type": result.followup_type,
-                        "reason": result.reason,
-                    },
-                    level="DEFAULT",
-                )
+            logger.info(f"Follow-up decision: should_followup={result.should_followup}, type={result.followup_type}")
             
             return result
             
         except Exception as e:
             logger.error(f"Follow-up generation failed: {e}")
-            if trace:
-                trace.update(
-                    output={"error": str(e), "used_fallback": True},
-                    level="ERROR",
-                )
             return self._get_fallback_followup(evaluation)
     
     def _parse_followup_response(
@@ -892,26 +767,6 @@ class AIReasoningLayer:
         """
         session_id = context.session.session_id
         
-        # Create Langfuse trace for evaluation
-        trace = None
-        if self.langfuse:
-            trace = self.langfuse.trace(
-                name="evaluate_response",
-                session_id=session_id,
-                input={
-                    "question_id": question.id,
-                    "question_text": question.text[:200],
-                    "transcript_length": len(transcript),
-                    "skill_id": question.skill_id,
-                },
-                metadata={
-                    "question_number": context.session.total_core_questions_asked,
-                    "difficulty": context.session.current_difficulty,
-                    "role": context.session.setup.target_role.value,
-                },
-                tags=["evaluation", question.skill_id or "unknown"],
-            )
-        
         prompt = self.evaluator_prompts.generate_evaluation_prompt(
             question=question,
             transcript=transcript,
@@ -933,39 +788,27 @@ class AIReasoningLayer:
             
             evaluation = self._parse_evaluation_response(response, question, transcript)
             
-            # Update trace with evaluation results
-            if trace:
-                trace.update(
-                    output={
-                        "overall_score": evaluation.scores.overall_score,
-                        "technical_correctness": evaluation.scores.technical_correctness,
-                        "depth_of_understanding": evaluation.scores.depth_of_understanding,
-                        "practical_experience": evaluation.scores.practical_experience,
-                        "communication_clarity": evaluation.scores.communication_clarity,
-                        "confidence": evaluation.scores.confidence,
-                        "needs_followup": evaluation.needs_followup,
-                        "difficulty_delta": evaluation.difficulty_delta,
-                    },
-                    level="DEFAULT",
-                )
-                
-                # Add score as Langfuse score
-                self.langfuse.score(
-                    trace_id=trace.id,
-                    name="overall_score",
-                    value=evaluation.scores.overall_score,
-                    comment=f"Skill: {question.skill_id}",
-                )
+            # Log evaluation results
+            logger.info(
+                f"Evaluation complete: score={evaluation.scores.overall_score:.1f}, "
+                f"needs_followup={evaluation.needs_followup}"
+            )
+            
+            # Log score to Langfuse
+            if self.langfuse:
+                try:
+                    self.langfuse.create_score(
+                        name="overall_score",
+                        value=evaluation.scores.overall_score,
+                        comment=f"Skill: {question.skill_id}, Session: {session_id}",
+                    )
+                except Exception as lf_err:
+                    logger.warning(f"Langfuse score failed: {lf_err}")
             
             return evaluation
             
         except Exception as e:
             logger.error(f"Evaluation failed: {e}")
-            if trace:
-                trace.update(
-                    output={"error": str(e), "used_fallback": True},
-                    level="ERROR",
-                )
             return self._get_fallback_evaluation(question, transcript)
     
     def _parse_evaluation_response(
