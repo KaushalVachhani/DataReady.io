@@ -365,27 +365,8 @@ class AIReasoningLayer:
         max_attempts = 3
         session_id = context.session.session_id
         
-        # Create Langfuse span as child of session trace
-        span = None
-        if self.langfuse and session_id:
-            parent_trace = self._get_session_trace(session_id)
-            try:
-                if parent_trace:
-                    # Create as child of session trace
-                    span = parent_trace.start_observation(
-                        name="generate_question",
-                        as_type="span",
-                        metadata={
-                            "question_number": context.session.total_core_questions_asked + 1,
-                            "difficulty": context.session.current_difficulty,
-                            "skills_covered": len(context.skills_covered),
-                            "skills_remaining": len(context.skills_remaining),
-                        },
-                    )
-                # If no parent trace, skip creating a separate trace
-            except Exception as lf_err:
-                logger.warning(f"Langfuse span start failed: {lf_err}")
-                span = None
+        # Note: No separate span needed - the question_generation_llm generation
+        # is already traced as a child of the session trace
         
         # Log context for debugging
         logger.info(
@@ -400,8 +381,7 @@ class AIReasoningLayer:
             prompt = self.interviewer_prompts.generate_question_prompt(context)
             
             # Log for prompt building
-            if span:
-                logger.debug(f"Built prompt for attempt {attempt + 1}, length: {len(prompt)}")
+            logger.debug(f"Built prompt for attempt {attempt + 1}, length: {len(prompt)}")
             
             try:
                 # Call Gemini Pro with trace context
@@ -435,20 +415,6 @@ class AIReasoningLayer:
                     )
                 
                 logger.info(f"Generated new question on skill: {question.skill_id}")
-                
-                # End span with success
-                if span:
-                    try:
-                        span.update(output={
-                            "question_id": question.id,
-                            "skill_id": question.skill_id,
-                            "difficulty": question.difficulty.value,
-                            "attempts": attempt + 1,
-                        })
-                        span.end()
-                    except Exception:
-                        pass
-                
                 return question
                 
             except Exception as e:
@@ -458,17 +424,6 @@ class AIReasoningLayer:
         
         # Fallback to a default question (with deduplication)
         logger.warning("Using fallback question due to generation failures")
-        
-        if span:
-            try:
-                span.update(
-                    output={"fallback_used": True, "reason": "generation_failures"},
-                    level="WARNING"
-                )
-                span.end()
-            except Exception:
-                pass
-        
         return self._get_fallback_question(context)
     
     def _parse_question_response(
