@@ -365,22 +365,24 @@ class AIReasoningLayer:
         max_attempts = 3
         session_id = context.session.session_id
         
-        # Create Langfuse span for the entire question generation flow (v3 API)
+        # Create Langfuse span as child of session trace
         span = None
-        if self.langfuse:
+        if self.langfuse and session_id:
+            parent_trace = self._get_session_trace(session_id)
             try:
-                span = self.langfuse.start_span(
-                    name="generate_question",
-                    metadata={
-                        "session_id": session_id,
-                        "question_number": context.session.total_core_questions_asked + 1,
-                        "difficulty": context.session.current_difficulty,
-                        "skills_covered": len(context.skills_covered),
-                        "skills_remaining": len(context.skills_remaining),
-                        "role": context.session.setup.target_role.value,
-                        "cloud_preference": context.session.setup.cloud_preference.value,
-                    },
-                )
+                if parent_trace:
+                    # Create as child of session trace
+                    span = parent_trace.start_observation(
+                        name="generate_question",
+                        as_type="span",
+                        metadata={
+                            "question_number": context.session.total_core_questions_asked + 1,
+                            "difficulty": context.session.current_difficulty,
+                            "skills_covered": len(context.skills_covered),
+                            "skills_remaining": len(context.skills_remaining),
+                        },
+                    )
+                # If no parent trace, skip creating a separate trace
             except Exception as lf_err:
                 logger.warning(f"Langfuse span start failed: {lf_err}")
                 span = None
