@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     tts_voice: str = "af_heart"  # Kokoro voice
     tts_rate: int = 16000
     
+    # Langfuse Observability
+    langfuse_secret_key: str = ""
+    langfuse_public_key: str = ""
+    langfuse_base_url: str = "https://cloud.langfuse.com"
+    langfuse_enabled: bool = True
+    
     # Interview settings
     max_questions: int = 10
     max_follow_ups_per_question: int = 2

@@ -8,6 +8,7 @@ Handles all AI-powered operations:
 - Difficulty adaptation
 
 Uses Gemini 3 Pro for deep reasoning and Gemini Flash for fast responses.
+Integrated with Langfuse for observability and tracing.
 """
 
 import json
@@ -15,6 +16,7 @@ import logging
 import httpx
 from typing import Any
 from uuid import uuid4
+from contextlib import contextmanager
 
 from src.config.settings import get_settings
 from src.models.interview import InterviewContext
@@ -37,6 +39,15 @@ from src.prompts.evaluator import EvaluatorPrompts
 
 logger = logging.getLogger(__name__)
 
+# Langfuse imports
+try:
+    from langfuse import Langfuse
+    from langfuse.decorators import observe, langfuse_context
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    LANGFUSE_AVAILABLE = False
+    logger.warning("Langfuse not installed. Tracing disabled.")
+
 
 class AIReasoningLayer:
     """
@@ -45,6 +56,9 @@ class AIReasoningLayer:
     Model Selection:
     - Gemini 3 Pro: Question generation, evaluation (deep reasoning)
     - Gemini Flash: Follow-up decisions, conversational (low latency)
+    
+    Observability:
+    - Langfuse integration for tracing all LLM calls
     """
     
     def __init__(self):
@@ -66,10 +80,31 @@ class AIReasoningLayer:
         # Prompt templates
         self.interviewer_prompts = InterviewerPrompts()
         self.evaluator_prompts = EvaluatorPrompts()
+        
+        # Initialize Langfuse for observability
+        self.langfuse = None
+        if LANGFUSE_AVAILABLE and self.settings.langfuse_enabled:
+            if self.settings.langfuse_secret_key and self.settings.langfuse_public_key:
+                try:
+                    self.langfuse = Langfuse(
+                        secret_key=self.settings.langfuse_secret_key,
+                        public_key=self.settings.langfuse_public_key,
+                        host=self.settings.langfuse_base_url,
+                    )
+                    logger.info("Langfuse initialized for LLM observability")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Langfuse: {e}")
+            else:
+                logger.info("Langfuse keys not configured, tracing disabled")
     
     async def close(self):
-        """Close the HTTP client."""
+        """Close the HTTP client and flush Langfuse."""
         await self.client.aclose()
+        if self.langfuse:
+            try:
+                self.langfuse.flush()
+            except Exception as e:
+                logger.warning(f"Failed to flush Langfuse: {e}")
     
     # =========================================================================
     # CORE AI OPERATIONS
@@ -91,17 +126,29 @@ class AIReasoningLayer:
         
         return content if isinstance(content, str) else str(content)
     
-    async def _call_gemini_pro(self, prompt: str, max_tokens: int = 2048) -> str:
+    async def _call_gemini_pro(
+        self, 
+        prompt: str, 
+        max_tokens: int = 2048,
+        trace_name: str = "gemini_pro_call",
+        trace_metadata: dict | None = None,
+        session_id: str | None = None,
+    ) -> str:
         """
         Call Gemini 3 Pro for deep reasoning tasks.
         
         Args:
             prompt: The prompt to send
             max_tokens: Maximum tokens in response
+            trace_name: Name for Langfuse trace
+            trace_metadata: Additional metadata for trace
+            session_id: Interview session ID for trace grouping
             
         Returns:
             Model response text
         """
+        generation = None
+        
         try:
             payload = {
                 "messages": [
@@ -111,6 +158,23 @@ class AIReasoningLayer:
                 "temperature": 0.7,
             }
             
+            # Start Langfuse generation tracking
+            if self.langfuse:
+                generation = self.langfuse.generation(
+                    name=trace_name,
+                    model="gemini-3-pro",
+                    model_parameters={
+                        "max_tokens": max_tokens,
+                        "temperature": 0.7,
+                    },
+                    input={"messages": payload["messages"]},
+                    metadata={
+                        "endpoint": self.settings.gemini_pro_endpoint,
+                        "session_id": session_id,
+                        **(trace_metadata or {}),
+                    },
+                )
+            
             response = await self.client.post(
                 self.settings.gemini_pro_endpoint,
                 json=payload,
@@ -118,23 +182,55 @@ class AIReasoningLayer:
             response.raise_for_status()
             
             result = response.json()
-            return self._extract_content(result)
+            output = self._extract_content(result)
+            
+            # Complete Langfuse generation
+            if generation:
+                generation.end(
+                    output=output,
+                    usage={
+                        "input": len(prompt.split()),  # Approximate token count
+                        "output": len(output.split()),
+                    },
+                    level="DEFAULT",
+                )
+            
+            return output
             
         except httpx.HTTPError as e:
             logger.error(f"Gemini Pro API error: {e}")
+            # Log error to Langfuse
+            if generation:
+                generation.end(
+                    output=None,
+                    level="ERROR",
+                    status_message=str(e),
+                )
             raise
     
-    async def _call_gemini_flash(self, prompt: str, max_tokens: int = 512) -> str:
+    async def _call_gemini_flash(
+        self, 
+        prompt: str, 
+        max_tokens: int = 512,
+        trace_name: str = "gemini_flash_call",
+        trace_metadata: dict | None = None,
+        session_id: str | None = None,
+    ) -> str:
         """
         Call Gemini Flash for fast, conversational responses.
         
         Args:
             prompt: The prompt to send
             max_tokens: Maximum tokens in response
+            trace_name: Name for Langfuse trace
+            trace_metadata: Additional metadata for trace
+            session_id: Interview session ID for trace grouping
             
         Returns:
             Model response text
         """
+        generation = None
+        
         try:
             payload = {
                 "messages": [
@@ -144,6 +240,23 @@ class AIReasoningLayer:
                 "temperature": 0.8,
             }
             
+            # Start Langfuse generation tracking
+            if self.langfuse:
+                generation = self.langfuse.generation(
+                    name=trace_name,
+                    model="gemini-flash",
+                    model_parameters={
+                        "max_tokens": max_tokens,
+                        "temperature": 0.8,
+                    },
+                    input={"messages": payload["messages"]},
+                    metadata={
+                        "endpoint": self.settings.gemini_flash_endpoint,
+                        "session_id": session_id,
+                        **(trace_metadata or {}),
+                    },
+                )
+            
             response = await self.client.post(
                 self.settings.gemini_flash_endpoint,
                 json=payload,
@@ -151,10 +264,30 @@ class AIReasoningLayer:
             response.raise_for_status()
             
             result = response.json()
-            return self._extract_content(result)
+            output = self._extract_content(result)
+            
+            # Complete Langfuse generation
+            if generation:
+                generation.end(
+                    output=output,
+                    usage={
+                        "input": len(prompt.split()),
+                        "output": len(output.split()),
+                    },
+                    level="DEFAULT",
+                )
+            
+            return output
             
         except httpx.HTTPError as e:
             logger.error(f"Gemini Flash API error: {e}")
+            # Log error to Langfuse
+            if generation:
+                generation.end(
+                    output=None,
+                    level="ERROR",
+                    status_message=str(e),
+                )
             raise
     
     # =========================================================================
@@ -179,6 +312,25 @@ class AIReasoningLayer:
             Generated Question object
         """
         max_attempts = 3
+        session_id = context.session.session_id
+        
+        # Create Langfuse trace for the entire question generation flow
+        trace = None
+        if self.langfuse:
+            trace = self.langfuse.trace(
+                name="generate_question",
+                session_id=session_id,
+                user_id=context.session.setup.target_role.value,
+                metadata={
+                    "question_number": context.session.total_core_questions_asked + 1,
+                    "difficulty": context.session.current_difficulty,
+                    "skills_covered": len(context.skills_covered),
+                    "skills_remaining": len(context.skills_remaining),
+                    "role": context.session.setup.target_role.value,
+                    "cloud_preference": context.session.setup.cloud_preference.value,
+                },
+                tags=["question_generation", context.session.setup.target_role.value],
+            )
         
         # Log context for debugging
         logger.info(
@@ -192,9 +344,26 @@ class AIReasoningLayer:
             # Build the prompt
             prompt = self.interviewer_prompts.generate_question_prompt(context)
             
+            # Log span for prompt building
+            if trace:
+                trace.span(
+                    name="build_prompt",
+                    input={"attempt": attempt + 1},
+                    output={"prompt_length": len(prompt)},
+                )
+            
             try:
-                # Call Gemini Pro
-                response = await self._call_gemini_pro(prompt, max_tokens=1024)
+                # Call Gemini Pro with trace context
+                response = await self._call_gemini_pro(
+                    prompt, 
+                    max_tokens=1024,
+                    trace_name="question_generation_llm",
+                    trace_metadata={
+                        "attempt": attempt + 1,
+                        "question_number": context.session.total_core_questions_asked + 1,
+                    },
+                    session_id=session_id,
+                )
                 
                 # Parse the response
                 question = self._parse_question_response(response, context)
@@ -205,27 +374,60 @@ class AIReasoningLayer:
                         f"Duplicate question detected (attempt {attempt + 1}): "
                         f"'{question.text[:50]}...' - regenerating..."
                     )
+                    if trace:
+                        trace.span(
+                            name="duplicate_check",
+                            input={"question_text": question.text[:100]},
+                            output={"is_duplicate": True},
+                            level="WARNING",
+                        )
                     continue
                 
                 # Also check if the same skill was recently asked (for core questions)
                 if question.skill_id and context.session.is_skill_asked(question.skill_id):
-                    # Only warn, don't block - sometimes a skill needs multiple questions
                     logger.info(
                         f"Skill '{question.skill_id}' was already targeted, "
                         f"but question text is different - allowing"
                     )
                 
                 logger.info(f"Generated new question on skill: {question.skill_id}")
+                
+                # Update trace with success
+                if trace:
+                    trace.update(
+                        output={
+                            "question_id": question.id,
+                            "skill_id": question.skill_id,
+                            "difficulty": question.difficulty.value,
+                            "attempts": attempt + 1,
+                        },
+                        level="DEFAULT",
+                    )
+                
                 return question
                 
             except Exception as e:
                 logger.error(f"Question generation failed (attempt {attempt + 1}): {e}")
+                if trace:
+                    trace.span(
+                        name="generation_error",
+                        input={"attempt": attempt + 1},
+                        output={"error": str(e)},
+                        level="ERROR",
+                    )
                 if attempt == max_attempts - 1:
-                    # Final attempt, use fallback
                     break
         
         # Fallback to a default question (with deduplication)
         logger.warning("Using fallback question due to generation failures")
+        
+        if trace:
+            trace.span(
+                name="fallback_used",
+                output={"reason": "generation_failures"},
+                level="WARNING",
+            )
+        
         return self._get_fallback_question(context)
     
     def _parse_question_response(
@@ -540,14 +742,59 @@ class AIReasoningLayer:
         Returns:
             FollowUpDecision with question if needed
         """
+        session_id = context.session.session_id
+        
+        # Create Langfuse trace for follow-up decision
+        trace = None
+        if self.langfuse:
+            trace = self.langfuse.trace(
+                name="generate_followup",
+                session_id=session_id,
+                metadata={
+                    "question_id": evaluation.question_id,
+                    "overall_score": evaluation.scores.overall_score,
+                    "needs_followup": evaluation.needs_followup,
+                    "followup_reason": evaluation.followup_reason,
+                },
+                tags=["followup_decision"],
+            )
+        
         prompt = self.interviewer_prompts.generate_followup_prompt(context, evaluation)
         
         try:
-            response = await self._call_gemini_flash(prompt, max_tokens=512)
-            return self._parse_followup_response(response, evaluation)
+            response = await self._call_gemini_flash(
+                prompt, 
+                max_tokens=512,
+                trace_name="followup_decision_llm",
+                trace_metadata={
+                    "question_id": evaluation.question_id,
+                    "score": evaluation.scores.overall_score,
+                },
+                session_id=session_id,
+            )
+            
+            result = self._parse_followup_response(response, evaluation)
+            
+            # Update trace with result
+            if trace:
+                trace.update(
+                    output={
+                        "should_followup": result.should_followup,
+                        "followup_type": result.followup_type,
+                        "reason": result.reason,
+                    },
+                    level="DEFAULT",
+                )
+            
+            return result
             
         except Exception as e:
             logger.error(f"Follow-up generation failed: {e}")
+            if trace:
+                trace.update(
+                    output={"error": str(e), "used_fallback": True},
+                    level="ERROR",
+                )
             return self._get_fallback_followup(evaluation)
     
     def _parse_followup_response(
@@ -643,6 +890,28 @@ class AIReasoningLayer:
         Returns:
             Complete ResponseEvaluation
         """
+        session_id = context.session.session_id
+        
+        # Create Langfuse trace for evaluation
+        trace = None
+        if self.langfuse:
+            trace = self.langfuse.trace(
+                name="evaluate_response",
+                session_id=session_id,
+                input={
+                    "question_id": question.id,
+                    "question_text": question.text[:200],
+                    "transcript_length": len(transcript),
+                    "skill_id": question.skill_id,
+                },
+                metadata={
+                    "question_number": context.session.total_core_questions_asked,
+                    "difficulty": context.session.current_difficulty,
+                    "role": context.session.setup.target_role.value,
+                },
+                tags=["evaluation", question.skill_id or "unknown"],
+            )
+        
         prompt = self.evaluator_prompts.generate_evaluation_prompt(
             question=question,
             transcript=transcript,
@@ -650,11 +919,53 @@ class AIReasoningLayer:
         )
         
         try:
-            response = await self._call_gemini_pro(prompt, max_tokens=1024)
-            return self._parse_evaluation_response(response, question, transcript)
+            response = await self._call_gemini_pro(
+                prompt, 
+                max_tokens=1024,
+                trace_name="evaluation_llm",
+                trace_metadata={
+                    "question_id": question.id,
+                    "skill_id": question.skill_id,
+                    "transcript_length": len(transcript),
+                },
+                session_id=session_id,
+            )
+            
+            evaluation = self._parse_evaluation_response(response, question, transcript)
+            
+            # Update trace with evaluation results
+            if trace:
+                trace.update(
+                    output={
+                        "overall_score": evaluation.scores.overall_score,
+                        "technical_correctness": evaluation.scores.technical_correctness,
+                        "depth_of_understanding": evaluation.scores.depth_of_understanding,
+                        "practical_experience": evaluation.scores.practical_experience,
+                        "communication_clarity": evaluation.scores.communication_clarity,
+                        "confidence": evaluation.scores.confidence,
+                        "needs_followup": evaluation.needs_followup,
+                        "difficulty_delta": evaluation.difficulty_delta,
+                    },
+                    level="DEFAULT",
+                )
+                
+                # Add score as Langfuse score
+                self.langfuse.score(
+                    trace_id=trace.id,
+                    name="overall_score",
+                    value=evaluation.scores.overall_score,
+                    comment=f"Skill: {question.skill_id}",
+                )
+            
+            return evaluation
             
         except Exception as e:
             logger.error(f"Evaluation failed: {e}")
+            if trace:
+                trace.update(
+                    output={"error": str(e), "used_fallback": True},
+                    level="ERROR",
+                )
             return self._get_fallback_evaluation(question, transcript)
     
     def _parse_evaluation_response(

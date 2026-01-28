@@ -18,6 +18,16 @@ env:
     valueFrom: GEMINI_PRO_ENDPOINT
   - name: GEMINI_FLASH_ENDPOINT
     valueFrom: GEMINI_FLASH_ENDPOINT
+  # Langfuse Observability
+  - name: LANGFUSE_SECRET_KEY
+    valueFrom: LANGFUSE_SECRET_KEY
+  - name: LANGFUSE_PUBLIC_KEY
+    valueFrom: LANGFUSE_PUBLIC_KEY
+  - name: LANGFUSE_BASE_URL
+    valueFrom: LANGFUSE_BASE_URL
+  - name: LANGFUSE_ENABLED
+    value: "true"
+  # App Configuration
   - name: USE_LOCAL_WHISPER
     value: "false"
   - name: DEBUG
