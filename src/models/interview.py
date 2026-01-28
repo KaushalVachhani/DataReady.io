@@ -139,6 +139,7 @@ class InterviewSession(BaseModel):
     current_question_index: int = 0
     total_core_questions_asked: int = 0
     total_followups_asked: int = 0
+    current_question_followups: int = 0  # Follow-ups for current core question
     
     # Question deduplication - track asked question texts (normalized)
     asked_question_hashes: set[str] = Field(default_factory=set)
@@ -189,8 +190,11 @@ class InterviewSession(BaseModel):
             self.total_core_questions_asked += 1
             # Clear conversation context for new core question
             self.current_question_context = []
+            # Reset per-question follow-up counter
+            self.current_question_followups = 0
         else:
             self.total_followups_asked += 1
+            self.current_question_followups += 1
         
         # Add to conversation context
         self.current_question_context.append({

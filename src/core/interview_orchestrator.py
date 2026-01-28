@@ -415,11 +415,12 @@ class InterviewOrchestrator:
         2. Ask next core question
         3. End interview
         """
-        # Check if we need a follow-up
+        # Check if we need a follow-up (max 2 per question)
+        max_followups_per_question = 2
         if (
             evaluation.needs_followup and
             session.setup.mode.value == "structured_followup" and
-            session.total_followups_asked < session.setup.max_questions * 2  # Max 2 follow-ups per question
+            session.current_question_followups < max_followups_per_question
         ):
             return await self._ask_followup(session, evaluation)
         

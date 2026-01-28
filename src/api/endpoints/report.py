@@ -52,6 +52,10 @@ class ReportResponse(BaseModel):
     study_roadmap: dict[str, Any] | None
     performance_timeline: list[dict[str, Any]]
     interview_duration_minutes: float
+    # Question-level feedback
+    question_feedback: list[dict[str, Any]] = []
+    total_questions: int = 0
+    total_followups: int = 0
 
 
 # ============================================================================
@@ -86,6 +90,11 @@ async def get_report(session_id: str) -> ReportResponse:
         # Generate report
         report_data = await orchestrator.generate_report(session_id)
         
+        # Get question feedback from session for stats
+        question_feedback = report_data.get("question_feedback", [])
+        total_questions = len(question_feedback)
+        total_followups = len([q for q in question_feedback if q.get("is_followup", False)])
+        
         # Format for response
         return ReportResponse(
             session_id=report_data["session_id"],
@@ -108,6 +117,9 @@ async def get_report(session_id: str) -> ReportResponse:
             study_roadmap=report_data.get("study_roadmap"),
             performance_timeline=report_data.get("performance_timeline", []),
             interview_duration_minutes=report_data["interview_duration_minutes"],
+            question_feedback=question_feedback,
+            total_questions=total_questions,
+            total_followups=total_followups,
         )
         
     except Exception as e:
