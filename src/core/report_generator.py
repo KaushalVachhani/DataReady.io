@@ -487,52 +487,61 @@ class ReportGenerator:
                     scores.get("confidence", 0) * 0.1
                 )
             
-            # Build improvement tips
+            # Build improvement tips from LLM evaluation
             improvements = []
             what_went_well = []
             
             if not is_skipped:
-                # Extract from evaluation
-                missing_points = eval_data.get("missing_points", [])
-                red_flags = eval_data.get("red_flags_triggered", [])
-                covered_points = eval_data.get("expected_points_covered", [])
+                # Extract from LLM evaluation feedback (correct structure)
+                feedback = eval_data.get("feedback", {})
                 
-                # What went well
-                if covered_points:
-                    what_went_well = [f"Covered: {point}" for point in covered_points[:3]]
+                # LLM-generated "what went well"
+                llm_what_went_well = feedback.get("what_went_well", [])
+                if llm_what_went_well:
+                    what_went_well = llm_what_went_well[:4]
                 
-                if scores.get("technical_correctness", 0) >= 7:
-                    what_went_well.append("Strong technical accuracy")
-                if scores.get("communication_clarity", 0) >= 7:
-                    what_went_well.append("Clear communication")
-                if scores.get("depth_of_understanding", 0) >= 7:
-                    what_went_well.append("Good depth of understanding")
+                # LLM-generated "what was missing" 
+                llm_what_missing = feedback.get("what_was_missing", [])
+                if llm_what_missing:
+                    improvements = [f"Missing: {point}" for point in llm_what_missing[:3]]
                 
-                # Areas for improvement
-                if missing_points:
-                    improvements = [f"Missing: {point}" for point in missing_points[:3]]
+                # LLM-generated red flags
+                llm_red_flags = feedback.get("red_flags", [])
+                if llm_red_flags:
+                    improvements.extend([f"Concern: {flag}" for flag in llm_red_flags[:2]])
                 
-                if red_flags:
-                    improvements.extend([f"Concern: {flag}" for flag in red_flags[:2]])
+                # LLM-generated improvement suggestions
+                llm_suggestions = feedback.get("improvement_suggestions", [])
+                if llm_suggestions:
+                    improvements.extend(llm_suggestions[:2])
                 
-                # Score-based suggestions
-                if scores.get("technical_correctness", 0) < 5:
-                    improvements.append("Review core concepts for accuracy")
-                if scores.get("practical_experience", 0) < 5:
-                    improvements.append("Include more real-world examples")
-                if scores.get("depth_of_understanding", 0) < 5:
-                    improvements.append("Go deeper into underlying principles")
-                if scores.get("communication_clarity", 0) < 5:
-                    improvements.append("Structure your answer more clearly")
+                # Fallback to score-based suggestions if LLM feedback is empty
+                if not what_went_well:
+                    if scores.get("technical_correctness", 0) >= 7:
+                        what_went_well.append("Strong technical accuracy")
+                    if scores.get("communication_clarity", 0) >= 7:
+                        what_went_well.append("Clear communication")
+                    if scores.get("depth_of_understanding", 0) >= 7:
+                        what_went_well.append("Good depth of understanding")
+                
+                if not improvements:
+                    if scores.get("technical_correctness", 0) < 5:
+                        improvements.append("Review core concepts for accuracy")
+                    if scores.get("practical_experience", 0) < 5:
+                        improvements.append("Include more real-world examples")
+                    if scores.get("depth_of_understanding", 0) < 5:
+                        improvements.append("Go deeper into underlying principles")
             else:
                 improvements = ["Question was skipped - no assessment possible"]
             
-            # Get expected answer from evaluation or generate
-            expected_answer = eval_data.get("expected_answer", "")
-            if not expected_answer and overall_score < 7:
-                expected_points = eval_data.get("expected_points", [])
-                if expected_points:
-                    expected_answer = "Key points to cover:\n• " + "\n• ".join(expected_points[:5])
+            # Get expected answer from question's expected_points
+            expected_answer = ""
+            expected_points = question.expected_points or []
+            if expected_points:
+                expected_answer = "Key points to cover:\n• " + "\n• ".join(expected_points[:5])
+            
+            # Also get red flags that were triggered
+            question_red_flags = question.red_flags or []
             
             # Get skill info
             skill_name = ""

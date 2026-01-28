@@ -288,11 +288,13 @@ class InterviewOrchestrator:
             # Fallback for testing
             question = self._generate_mock_question(session)
         
-        # Create question response record
+        # Create question response record with expected points for feedback
         question_response = QuestionResponse(
             question_id=question.id,
             question_text=question.text,
             skill_id=question.skill_id,
+            expected_points=question.expected_points or [],
+            red_flags=question.red_flags or [],
             asked_at=datetime.utcnow(),
         )
         
@@ -467,6 +469,8 @@ class InterviewOrchestrator:
             question_id=f"{current_question.question_id}_followup_{session.total_followups_asked + 1}",
             question_text=followup_text,
             skill_id=current_question.skill_id,  # Inherit from parent question
+            expected_points=current_question.expected_points,  # Inherit for context
+            red_flags=current_question.red_flags,  # Inherit for context
             asked_at=datetime.utcnow(),
             is_followup=True,
             parent_question_id=current_question.question_id,

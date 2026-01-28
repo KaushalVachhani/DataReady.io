@@ -99,6 +99,10 @@ class QuestionResponse(BaseModel):
     # Skill tracking
     skill_id: str | None = None
     
+    # Expected answer points (for feedback generation)
+    expected_points: list[str] = Field(default_factory=list)
+    red_flags: list[str] = Field(default_factory=list)
+    
     # Timing
     asked_at: datetime
     response_started_at: datetime | None = None
