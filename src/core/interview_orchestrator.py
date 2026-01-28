@@ -193,8 +193,8 @@ class InterviewOrchestrator:
         elif new_state == InterviewState.COMPLETE:
             session.completed_at = datetime.utcnow()
             # End Langfuse trace when interview completes (from any path)
-            if self.ai_layer:
-                self.ai_layer.end_interview_trace(
+            if self.ai_reasoning:
+                self.ai_reasoning.end_interview_trace(
                     session_id=session_id,
                     metadata={
                         "questions_completed": len(session.questions),
@@ -206,8 +206,8 @@ class InterviewOrchestrator:
         elif new_state == InterviewState.ERROR:
             session.error_message = error_message
             # End Langfuse trace on error
-            if self.ai_layer:
-                self.ai_layer.end_interview_trace(
+            if self.ai_reasoning:
+                self.ai_reasoning.end_interview_trace(
                     session_id=session_id,
                     metadata={"final_state": "error", "error": error_message}
                 )
@@ -241,8 +241,8 @@ class InterviewOrchestrator:
             raise ValueError(f"Session not found: {session_id}")
         
         # Start Langfuse trace for the entire interview
-        if self.ai_layer:
-            self.ai_layer.start_interview_trace(
+        if self.ai_reasoning:
+            self.ai_reasoning.start_interview_trace(
                 session_id=session_id,
                 metadata={
                     "target_role": session.setup.target_role.value,

@@ -340,8 +340,8 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
                 
                 # Flush Langfuse traces before closing
                 try:
-                    if orchestrator.ai_layer and orchestrator.ai_layer.langfuse:
-                        orchestrator.ai_layer.langfuse.flush()
+                    if orchestrator.ai_reasoning and orchestrator.ai_reasoning.langfuse:
+                        orchestrator.ai_reasoning.langfuse.flush()
                         ws_logger.info("Langfuse traces flushed")
                 except Exception as lf_err:
                     ws_logger.debug(f"Langfuse flush failed: {lf_err}")
@@ -358,8 +358,8 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         # Client disconnected - flush traces
         try:
-            if orchestrator.ai_layer and orchestrator.ai_layer.langfuse:
-                orchestrator.ai_layer.langfuse.flush()
+            if orchestrator.ai_reasoning and orchestrator.ai_reasoning.langfuse:
+                orchestrator.ai_reasoning.langfuse.flush()
         except Exception:
             pass
     except Exception as e:
@@ -370,7 +370,7 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
     finally:
         # Always flush Langfuse on connection close
         try:
-            if orchestrator.ai_layer and orchestrator.ai_layer.langfuse:
-                orchestrator.ai_layer.langfuse.flush()
+            if orchestrator.ai_reasoning and orchestrator.ai_reasoning.langfuse:
+                orchestrator.ai_reasoning.langfuse.flush()
         except Exception:
             pass
