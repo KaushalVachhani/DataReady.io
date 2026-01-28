@@ -131,7 +131,8 @@ Requirements:
 7. MUST be on a completely NEW topic not covered in any previous question
 8. When possible, frame questions using {context.session.setup.cloud_preference.value} services
 
-Output JSON format:
+IMPORTANT: Output ONLY valid JSON, no preamble text, no explanations. Start directly with {{
+
 {{
     "question": "Your question text here",
     "category": "sql|python|etl|spark|streaming|cloud|orchestration|data_modeling|system_design|distributed|performance|governance|observability",
@@ -141,9 +142,7 @@ Output JSON format:
     "difficulty_score": {context.session.current_difficulty},
     "expected_points": ["point 1", "point 2", "point 3"],
     "red_flags": ["concerning answer pattern 1"]
-}}
-
-Generate the question now:"""
+}}"""
 
         return prompt
     
@@ -219,16 +218,15 @@ Follow-up types:
 - challenge: Push back or ask about edge cases
 - example: Ask for a concrete example
 
-Output JSON format:
+IMPORTANT: Output ONLY valid JSON, no preamble text. Start directly with {{
+
 {{
     "should_followup": true/false,
     "reason": "Why you are or aren't asking a follow-up",
     "type": "probe|clarify|challenge|example",
     "question": "Your follow-up question or clarification (if should_followup is true)",
     "difficulty_adjustment": -1/0/1
-}}
-
-Decide now:"""
+}}"""
 
         return prompt
     

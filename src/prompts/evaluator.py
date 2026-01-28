@@ -120,7 +120,8 @@ Question Category: {question.category.value}
 === YOUR TASK ===
 Evaluate the response according to the rubric.
 
-Provide your evaluation in JSON format:
+IMPORTANT: Output ONLY valid JSON, no preamble text. Start directly with {{
+
 {{
     "scores": {{
         "technical_correctness": <0-10>,
@@ -130,20 +131,18 @@ Provide your evaluation in JSON format:
         "confidence": <0-10>
     }},
     "feedback": {{
-        "what_went_well": ["point 1", "point 2"],
-        "what_was_missing": ["point 1", "point 2"],
-        "red_flags": ["if any"],
+        "what_went_well": ["specific point 1", "specific point 2"],
+        "what_was_missing": ["missing concept 1", "missing concept 2"],
+        "red_flags": ["if any concerns"],
         "seniority_signals": ["signals indicating their experience level"],
-        "improvement_suggestions": ["how they could improve this answer"]
+        "improvement_suggestions": ["specific actionable improvement 1", "improvement 2"]
     }},
     "needs_followup": true/false,
     "followup_reason": "why a follow-up would or wouldn't help",
-    "followup_type": "probe|clarify|challenge|example" (if needs_followup is true),
+    "followup_type": "probe|clarify|challenge|example",
     "difficulty_delta": <-2 to +2>,
     "notes": "Any additional observations"
-}}
-
-Evaluate now:"""
+}}"""
 
         return prompt
     
