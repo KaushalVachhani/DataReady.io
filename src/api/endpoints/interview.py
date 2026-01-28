@@ -356,10 +356,21 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
                 await websocket.send_json({"type": "pong"})
                 
     except WebSocketDisconnect:
-        # Client disconnected
-        pass
+        # Client disconnected - flush traces
+        try:
+            if orchestrator.ai_layer and orchestrator.ai_layer.langfuse:
+                orchestrator.ai_layer.langfuse.flush()
+        except Exception:
+            pass
     except Exception as e:
         await websocket.send_json({
             "type": "error",
             "message": str(e),
         })
+    finally:
+        # Always flush Langfuse on connection close
+        try:
+            if orchestrator.ai_layer and orchestrator.ai_layer.langfuse:
+                orchestrator.ai_layer.langfuse.flush()
+        except Exception:
+            pass
