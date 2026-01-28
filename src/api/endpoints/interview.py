@@ -337,6 +337,15 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
             elif message_type == "end":
                 # End interview
                 result = await orchestrator.end_interview(session_id)
+                
+                # Flush Langfuse traces before closing
+                try:
+                    if orchestrator.ai_layer and orchestrator.ai_layer.langfuse:
+                        orchestrator.ai_layer.langfuse.flush()
+                        ws_logger.info("Langfuse traces flushed")
+                except Exception as lf_err:
+                    ws_logger.debug(f"Langfuse flush failed: {lf_err}")
+                
                 await websocket.send_json({
                     "type": "ended",
                     "data": result,

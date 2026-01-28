@@ -147,6 +147,22 @@ class AIReasoningLayer:
         Returns:
             Model response text
         """
+        generation = None
+        
+        # Start Langfuse generation trace
+        if self.langfuse:
+            try:
+                generation = self.langfuse.start_observation(
+                    name=trace_name,
+                    as_type="generation",
+                    input=prompt[:2000],  # Truncate to avoid huge payloads
+                    model="gemini-3-pro",
+                    model_parameters={"max_tokens": max_tokens, "temperature": 0.7},
+                    metadata=trace_metadata or {},
+                )
+            except Exception as e:
+                logger.debug(f"Langfuse generation start failed: {e}")
+        
         try:
             payload = {
                 "messages": [
@@ -163,10 +179,26 @@ class AIReasoningLayer:
             response.raise_for_status()
             
             result = response.json()
-            return self._extract_content(result)
+            output = self._extract_content(result)
+            
+            # End generation with output
+            if generation:
+                try:
+                    generation.update(output=output[:2000])  # Truncate output
+                    generation.end()
+                except Exception as e:
+                    logger.debug(f"Langfuse generation end failed: {e}")
+            
+            return output
             
         except httpx.HTTPError as e:
             logger.error(f"Gemini Pro API error: {e}")
+            if generation:
+                try:
+                    generation.update(level="ERROR", status_message=str(e))
+                    generation.end()
+                except Exception:
+                    pass
             raise
     
     async def _call_gemini_flash(
@@ -190,6 +222,22 @@ class AIReasoningLayer:
         Returns:
             Model response text
         """
+        generation = None
+        
+        # Start Langfuse generation trace
+        if self.langfuse:
+            try:
+                generation = self.langfuse.start_observation(
+                    name=trace_name,
+                    as_type="generation",
+                    input=prompt[:2000],  # Truncate to avoid huge payloads
+                    model="gemini-flash",
+                    model_parameters={"max_tokens": max_tokens, "temperature": 0.8},
+                    metadata=trace_metadata or {},
+                )
+            except Exception as e:
+                logger.debug(f"Langfuse generation start failed: {e}")
+        
         try:
             payload = {
                 "messages": [
@@ -206,10 +254,26 @@ class AIReasoningLayer:
             response.raise_for_status()
             
             result = response.json()
-            return self._extract_content(result)
+            output = self._extract_content(result)
+            
+            # End generation with output
+            if generation:
+                try:
+                    generation.update(output=output[:2000])  # Truncate output
+                    generation.end()
+                except Exception as e:
+                    logger.debug(f"Langfuse generation end failed: {e}")
+            
+            return output
             
         except httpx.HTTPError as e:
             logger.error(f"Gemini Flash API error: {e}")
+            if generation:
+                try:
+                    generation.update(level="ERROR", status_message=str(e))
+                    generation.end()
+                except Exception:
+                    pass
             raise
     
     # =========================================================================
@@ -308,12 +372,13 @@ class AIReasoningLayer:
                 # End span with success
                 if span:
                     try:
-                        span.end(output={
+                        span.update(output={
                             "question_id": question.id,
                             "skill_id": question.skill_id,
                             "difficulty": question.difficulty.value,
                             "attempts": attempt + 1,
                         })
+                        span.end()
                     except Exception:
                         pass
                 
@@ -329,7 +394,11 @@ class AIReasoningLayer:
         
         if span:
             try:
-                span.end(output={"fallback_used": True, "reason": "generation_failures"})
+                span.update(
+                    output={"fallback_used": True, "reason": "generation_failures"},
+                    level="WARNING"
+                )
+                span.end()
             except Exception:
                 pass
         
