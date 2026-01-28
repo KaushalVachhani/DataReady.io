@@ -192,8 +192,25 @@ class InterviewOrchestrator:
             session.started_at = datetime.utcnow()
         elif new_state == InterviewState.COMPLETE:
             session.completed_at = datetime.utcnow()
+            # End Langfuse trace when interview completes (from any path)
+            if self.ai_layer:
+                self.ai_layer.end_interview_trace(
+                    session_id=session_id,
+                    metadata={
+                        "questions_completed": len(session.questions),
+                        "total_core_questions": session.total_core_questions_asked,
+                        "total_followups": session.total_followups_asked,
+                        "final_state": "complete",
+                    }
+                )
         elif new_state == InterviewState.ERROR:
             session.error_message = error_message
+            # End Langfuse trace on error
+            if self.ai_layer:
+                self.ai_layer.end_interview_trace(
+                    session_id=session_id,
+                    metadata={"final_state": "error", "error": error_message}
+                )
         
         # Save session
         await self.update_session(session)
@@ -222,6 +239,19 @@ class InterviewOrchestrator:
         session = self.get_session(session_id)
         if not session:
             raise ValueError(f"Session not found: {session_id}")
+        
+        # Start Langfuse trace for the entire interview
+        if self.ai_layer:
+            self.ai_layer.start_interview_trace(
+                session_id=session_id,
+                metadata={
+                    "target_role": session.setup.target_role.value,
+                    "cloud_preference": session.setup.cloud_preference.value,
+                    "years_of_experience": session.setup.years_of_experience,
+                    "mode": session.setup.mode.value,
+                    "max_questions": session.setup.max_questions,
+                }
+            )
         
         # Transition to READY
         await self.transition_state(session_id, InterviewState.READY)
@@ -482,6 +512,7 @@ class InterviewOrchestrator:
         session.completed_at = datetime.utcnow()
         await self.update_session(session)
         
+        # Trace is ended automatically in transition_state when moving to COMPLETE
         await self.transition_state(session_id, InterviewState.COMPLETE)
         
         return {

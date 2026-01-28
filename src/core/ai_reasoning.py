@@ -83,6 +83,7 @@ class AIReasoningLayer:
         
         # Initialize Langfuse for observability
         self.langfuse = None
+        self._session_traces: dict[str, Any] = {}  # Store traces per session
         if LANGFUSE_AVAILABLE and self.settings.langfuse_enabled:
             if self.settings.langfuse_secret_key and self.settings.langfuse_public_key:
                 try:
@@ -96,6 +97,44 @@ class AIReasoningLayer:
                     logger.warning(f"Failed to initialize Langfuse: {e}")
             else:
                 logger.info("Langfuse keys not configured, tracing disabled")
+    
+    def start_interview_trace(self, session_id: str, metadata: dict | None = None) -> None:
+        """Start a parent trace for the entire interview session."""
+        if not self.langfuse:
+            return
+        
+        try:
+            trace = self.langfuse.start_span(
+                name="interview_session",
+                metadata={
+                    "session_id": session_id,
+                    **(metadata or {}),
+                },
+            )
+            self._session_traces[session_id] = trace
+            logger.info(f"Started Langfuse trace for session {session_id}")
+        except Exception as e:
+            logger.warning(f"Failed to start interview trace: {e}")
+    
+    def end_interview_trace(self, session_id: str, metadata: dict | None = None) -> None:
+        """End the parent trace for an interview session."""
+        if not self.langfuse:
+            return
+        
+        trace = self._session_traces.pop(session_id, None)
+        if trace:
+            try:
+                if metadata:
+                    trace.update(output=metadata)
+                trace.end()
+                self.langfuse.flush()
+                logger.info(f"Ended Langfuse trace for session {session_id}")
+            except Exception as e:
+                logger.warning(f"Failed to end interview trace: {e}")
+    
+    def _get_session_trace(self, session_id: str):
+        """Get the active trace for a session."""
+        return self._session_traces.get(session_id)
     
     async def close(self):
         """Close the HTTP client and flush Langfuse."""
@@ -149,17 +188,30 @@ class AIReasoningLayer:
         """
         generation = None
         
-        # Start Langfuse generation trace
-        if self.langfuse:
+        # Start Langfuse generation trace as child of session trace
+        if self.langfuse and session_id:
+            parent_trace = self._get_session_trace(session_id)
             try:
-                generation = self.langfuse.start_observation(
-                    name=trace_name,
-                    as_type="generation",
-                    input=prompt[:2000],  # Truncate to avoid huge payloads
-                    model="gemini-3-pro",
-                    model_parameters={"max_tokens": max_tokens, "temperature": 0.7},
-                    metadata=trace_metadata or {},
-                )
+                if parent_trace:
+                    # Create as child of session trace
+                    generation = parent_trace.start_observation(
+                        name=trace_name,
+                        as_type="generation",
+                        input=prompt[:2000],  # Truncate to avoid huge payloads
+                        model="gemini-3-pro",
+                        model_parameters={"max_tokens": max_tokens, "temperature": 0.7},
+                        metadata=trace_metadata or {},
+                    )
+                else:
+                    # No parent trace, create standalone
+                    generation = self.langfuse.start_observation(
+                        name=trace_name,
+                        as_type="generation",
+                        input=prompt[:2000],
+                        model="gemini-3-pro",
+                        model_parameters={"max_tokens": max_tokens, "temperature": 0.7},
+                        metadata=trace_metadata or {},
+                    )
             except Exception as e:
                 logger.debug(f"Langfuse generation start failed: {e}")
         
@@ -224,17 +276,30 @@ class AIReasoningLayer:
         """
         generation = None
         
-        # Start Langfuse generation trace
-        if self.langfuse:
+        # Start Langfuse generation trace as child of session trace
+        if self.langfuse and session_id:
+            parent_trace = self._get_session_trace(session_id)
             try:
-                generation = self.langfuse.start_observation(
-                    name=trace_name,
-                    as_type="generation",
-                    input=prompt[:2000],  # Truncate to avoid huge payloads
-                    model="gemini-flash",
-                    model_parameters={"max_tokens": max_tokens, "temperature": 0.8},
-                    metadata=trace_metadata or {},
-                )
+                if parent_trace:
+                    # Create as child of session trace
+                    generation = parent_trace.start_observation(
+                        name=trace_name,
+                        as_type="generation",
+                        input=prompt[:2000],  # Truncate to avoid huge payloads
+                        model="gemini-flash",
+                        model_parameters={"max_tokens": max_tokens, "temperature": 0.8},
+                        metadata=trace_metadata or {},
+                    )
+                else:
+                    # No parent trace, create standalone
+                    generation = self.langfuse.start_observation(
+                        name=trace_name,
+                        as_type="generation",
+                        input=prompt[:2000],
+                        model="gemini-flash",
+                        model_parameters={"max_tokens": max_tokens, "temperature": 0.8},
+                        metadata=trace_metadata or {},
+                    )
             except Exception as e:
                 logger.debug(f"Langfuse generation start failed: {e}")
         
