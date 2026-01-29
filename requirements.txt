@@ -20,7 +20,7 @@ edge-tts>=6.1.9
 pydub>=0.25.1
 
 # Observability & Tracing
-langfuse>=2.0.0
+langfuse==2.0.0  # Pinned version for better caching
 
 # Utilities
 python-dotenv>=1.0.0
